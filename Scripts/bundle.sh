@@ -20,4 +20,7 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
 cp "$BINARY" "$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 cp "$PROJECT_DIR/Resources/Info.plist" "$APP_BUNDLE/Contents/"
 
+echo "Signing $APP_BUNDLE..."
+codesign --force --sign - "$APP_BUNDLE"
+
 echo "Done. Run with: open $APP_BUNDLE"
