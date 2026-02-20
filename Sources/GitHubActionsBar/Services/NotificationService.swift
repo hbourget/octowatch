@@ -29,9 +29,9 @@ enum NotificationService {
         content.body = "\(runName) on \(repoName)"
         switch run.conclusion {
         case .success:
-            NSSound(named: "Breeze")?.play()
+            NSSound(named: "Glass")?.play()
         case .failure:
-            NSSound(named: "Bubble")?.play()
+            NSSound(named: "Basso")?.play()
         default:
             break
         }
