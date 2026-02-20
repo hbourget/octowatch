@@ -5,10 +5,9 @@ struct SettingsView: View {
     let onBack: () -> Void
 
     private let intervals: [(label: String, value: TimeInterval)] = [
+        ("1 second", 1),
+        ("3 seconds", 3),
         ("15 seconds", 15),
-        ("30 seconds", 30),
-        ("1 minute", 60),
-        ("5 minutes", 300),
     ]
 
     var body: some View {
