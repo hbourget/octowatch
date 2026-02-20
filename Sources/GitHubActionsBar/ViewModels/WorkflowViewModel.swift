@@ -20,7 +20,7 @@ final class WorkflowViewModel {
     // MARK: - Settings (persisted)
 
     var pollingInterval: TimeInterval {
-        get { UserDefaults.standard.double(forKey: "pollingInterval").nonZero ?? 30 }
+        get { UserDefaults.standard.double(forKey: "pollingInterval").nonZero ?? 15 }
         set {
             UserDefaults.standard.set(newValue, forKey: "pollingInterval")
             restartPolling()
@@ -231,16 +231,27 @@ final class WorkflowViewModel {
         pulseTask = nil
     }
 
-    private func computeAggregateStatus(_ runs: [WorkflowRun]) -> AggregateStatus {
-        guard !runs.isEmpty else { return .idle }
+    private func latestRunPerWorkflow(_ runs: [WorkflowRun]) -> [WorkflowRun] {
+        var seen: Set<String> = []
+        return runs
+            .sorted { $0.updatedAt > $1.updatedAt }
+            .filter { run in
+                guard let name = run.name else { return true }
+                return seen.insert(name).inserted
+            }
+    }
 
-        let hasInProgress = runs.contains {
+    private func computeAggregateStatus(_ runs: [WorkflowRun]) -> AggregateStatus {
+        let latest = latestRunPerWorkflow(runs)
+        guard !latest.isEmpty else { return .idle }
+
+        let hasInProgress = latest.contains {
             $0.status == .inProgress || $0.status == .queued
         }
-        let hasFailed = runs.contains {
+        let hasFailed = latest.contains {
             $0.conclusion == .failure || $0.conclusion == .timedOut
         }
-        let hasSuccess = runs.contains { $0.conclusion == .success }
+        let hasSuccess = latest.contains { $0.conclusion == .success }
 
         if hasInProgress { return .inProgress }
         if hasFailed && hasSuccess { return .mixed }

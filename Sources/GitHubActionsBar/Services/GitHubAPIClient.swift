@@ -4,6 +4,7 @@ actor GitHubAPIClient {
     private let session: URLSession
     private let baseURL = "https://api.github.com"
     private(set) var rateLimitRemaining: Int?
+    private var etagCache: [URL: (etag: String, data: Data)] = [:]
 
     init(session: URLSession = .shared) {
         self.session = session
@@ -82,21 +83,39 @@ actor GitHubAPIClient {
     }
 
     private func perform<T: Decodable & Sendable>(_ request: URLRequest) async throws -> T {
+        var request = request
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+
+        if let url = request.url, let cached = etagCache[url] {
+            request.setValue(cached.etag, forHTTPHeaderField: "If-None-Match")
+        }
+
         let (data, response) = try await session.data(for: request)
+
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        decoder.dateDecodingStrategy = .iso8601
 
         if let httpResponse = response as? HTTPURLResponse {
             if let remaining = httpResponse.value(forHTTPHeaderField: "X-RateLimit-Remaining") {
                 rateLimitRemaining = Int(remaining)
             }
 
+            if httpResponse.statusCode == 304, let url = request.url, let cached = etagCache[url] {
+                return try decoder.decode(T.self, from: cached.data)
+            }
+
             guard (200...299).contains(httpResponse.statusCode) else {
                 throw APIError.httpError(httpResponse.statusCode)
             }
+
+            if let url = request.url,
+                let etag = httpResponse.value(forHTTPHeaderField: "ETag")
+            {
+                etagCache[url] = (etag: etag, data: data)
+            }
         }
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode(T.self, from: data)
     }
 }
