@@ -17,13 +17,15 @@ struct WorkflowRunListView: View {
             }
             .frame(maxWidth: .infinity)
         } else {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(runs) { run in
-                        WorkflowRunRow(run: run)
-                        if run.id != runs.last?.id {
-                            Divider()
-                                .padding(.horizontal, 16)
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(runs) { run in
+                            WorkflowRunRow(run: run, now: context.date)
+                            if run.id != runs.last?.id {
+                                Divider()
+                                    .padding(.horizontal, 16)
+                            }
                         }
                     }
                 }

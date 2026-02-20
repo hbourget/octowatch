@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WorkflowRunRow: View {
     let run: WorkflowRun
+    var now: Date = Date()
 
     private static let timeFormatter: RelativeDateTimeFormatter = {
         let f = RelativeDateTimeFormatter()
@@ -40,7 +41,7 @@ struct WorkflowRunRow: View {
 
                 Text(
                     Self.timeFormatter.localizedString(
-                        for: run.updatedAt, relativeTo: Date())
+                        for: run.updatedAt, relativeTo: now)
                 )
                 .font(.caption)
                 .foregroundStyle(.tertiary)
