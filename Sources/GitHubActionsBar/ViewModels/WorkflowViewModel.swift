@@ -1,0 +1,228 @@
+import Foundation
+import SwiftUI
+
+@Observable
+@MainActor
+final class WorkflowViewModel {
+    // MARK: - State
+
+    var isAuthenticated = false
+    var username = ""
+    var runs: [WorkflowRun] = []
+    var repos: [Repository] = []
+    var isLoading = false
+    var errorMessage: String?
+    var showSettings = false
+    var aggregateStatus: AggregateStatus = .idle
+
+    // MARK: - Settings (persisted)
+
+    var pollingInterval: TimeInterval {
+        get { UserDefaults.standard.double(forKey: "pollingInterval").nonZero ?? 30 }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "pollingInterval")
+            restartPolling()
+        }
+    }
+
+    var selectedRepoFullNames: Set<String> {
+        get {
+            guard let data = UserDefaults.standard.string(forKey: "selectedRepos"),
+                let names = try? JSONDecoder().decode(Set<String>.self, from: Data(data.utf8))
+            else { return [] }
+            return names
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue),
+                let str = String(data: data, encoding: .utf8)
+            {
+                UserDefaults.standard.set(str, forKey: "selectedRepos")
+            }
+        }
+    }
+
+    // MARK: - Private
+
+    private let apiClient = GitHubAPIClient()
+    private var pollingTask: Task<Void, Never>?
+    private var previousInProgressIds: Set<Int64> = []
+    private var token: String?
+
+    // MARK: - Init
+
+    init() {
+        if let pat = KeychainService.retrievePAT() {
+            token = pat
+            isAuthenticated = true
+            Task { await loadInitialData() }
+        }
+    }
+
+    // MARK: - Auth
+
+    func signIn(pat: String) async {
+        isLoading = true
+        errorMessage = nil
+        do {
+            let user = try await apiClient.fetchAuthenticatedUser(token: pat)
+            try KeychainService.savePAT(pat)
+            token = pat
+            username = user.login
+            isAuthenticated = true
+            NotificationService.requestPermission()
+            await loadInitialData()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
+
+    func signOut() {
+        stopPolling()
+        KeychainService.deletePAT()
+        token = nil
+        isAuthenticated = false
+        username = ""
+        runs = []
+        repos = []
+        aggregateStatus = .idle
+        showSettings = false
+        errorMessage = nil
+    }
+
+    // MARK: - Data Loading
+
+    func loadInitialData() async {
+        guard let token else { return }
+        isLoading = true
+        errorMessage = nil
+        do {
+            let user = try await apiClient.fetchAuthenticatedUser(token: token)
+            username = user.login
+
+            repos = try await apiClient.fetchUserRepos(token: token)
+
+            // Select all repos by default if none selected
+            if selectedRepoFullNames.isEmpty {
+                selectedRepoFullNames = Set(repos.map(\.fullName))
+            }
+
+            await fetchRuns()
+            startPolling()
+        } catch {
+            handleError(error)
+        }
+        isLoading = false
+    }
+
+    func fetchRuns() async {
+        guard let token else { return }
+        errorMessage = nil
+
+        let activeRepos = repos.filter { selectedRepoFullNames.contains($0.fullName) }
+        let repoTuples = activeRepos.map { (owner: $0.owner.login, repo: $0.name) }
+
+        guard !repoTuples.isEmpty else {
+            runs = []
+            aggregateStatus = .idle
+            return
+        }
+
+        do {
+            let newRuns = try await apiClient.fetchAllWorkflowRuns(
+                repos: repoTuples, token: token)
+            detectCompletions(newRuns: newRuns)
+            runs = newRuns
+            aggregateStatus = computeAggregateStatus(newRuns)
+
+            if let remaining = await apiClient.rateLimitRemaining, remaining < 100 {
+                errorMessage = "Rate limit low: \(remaining) requests remaining"
+            }
+        } catch {
+            handleError(error)
+        }
+    }
+
+    func refresh() {
+        Task { await fetchRuns() }
+    }
+
+    // MARK: - Polling
+
+    func startPolling() {
+        stopPolling()
+        pollingTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(pollingInterval))
+                guard !Task.isCancelled else { break }
+                await fetchRuns()
+            }
+        }
+    }
+
+    func stopPolling() {
+        pollingTask?.cancel()
+        pollingTask = nil
+    }
+
+    private func restartPolling() {
+        if isAuthenticated {
+            startPolling()
+        }
+    }
+
+    // MARK: - Notifications
+
+    private func detectCompletions(newRuns: [WorkflowRun]) {
+        let newInProgressIds = Set(
+            newRuns
+                .filter { $0.status == .inProgress || $0.status == .queued }
+                .map(\.id)
+        )
+
+        for run in newRuns where run.status == .completed {
+            if previousInProgressIds.contains(run.id) {
+                NotificationService.sendRunCompleted(run: run)
+            }
+        }
+
+        previousInProgressIds = newInProgressIds
+    }
+
+    // MARK: - Helpers
+
+    private func computeAggregateStatus(_ runs: [WorkflowRun]) -> AggregateStatus {
+        guard !runs.isEmpty else { return .idle }
+
+        let hasInProgress = runs.contains {
+            $0.status == .inProgress || $0.status == .queued
+        }
+        let hasFailed = runs.contains {
+            $0.conclusion == .failure || $0.conclusion == .timedOut
+        }
+        let hasSuccess = runs.contains { $0.conclusion == .success }
+
+        if hasInProgress { return .inProgress }
+        if hasFailed && hasSuccess { return .mixed }
+        if hasFailed { return .failed }
+        if hasSuccess { return .allGreen }
+        return .idle
+    }
+
+    private func handleError(_ error: Error) {
+        if let apiError = error as? APIError, apiError.isAuthError {
+            signOut()
+            errorMessage = "Session expired. Please sign in again."
+        } else {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Double Extension
+
+extension Double {
+    var nonZero: Double? {
+        self == 0 ? nil : self
+    }
+}
