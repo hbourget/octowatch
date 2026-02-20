@@ -1,8 +1,11 @@
+import ServiceManagement
 import SwiftUI
 
 struct SettingsView: View {
     @Bindable var viewModel: WorkflowViewModel
     let onBack: () -> Void
+
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     private let intervals: [(label: String, value: TimeInterval)] = [
         ("1 second", 1),
@@ -53,6 +56,24 @@ struct SettingsView: View {
                         .pickerStyle(.segmented)
                         .labelsHidden()
                     }
+
+                    Divider()
+
+                    // Launch at Login
+                    Toggle("Launch at Login", isOn: $launchAtLogin)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .onChange(of: launchAtLogin) { _, newValue in
+                            do {
+                                if newValue {
+                                    try SMAppService.mainApp.register()
+                                } else {
+                                    try SMAppService.mainApp.unregister()
+                                }
+                            } catch {
+                                launchAtLogin = SMAppService.mainApp.status == .enabled
+                            }
+                        }
 
                     Divider()
 
