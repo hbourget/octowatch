@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import UserNotifications
 
@@ -26,7 +27,15 @@ enum NotificationService {
         }
 
         content.body = "\(runName) on \(repoName)"
-        content.sound = .default
+        switch run.conclusion {
+        case .success:
+            NSSound(named: "Breeze")?.play()
+        case .failure:
+            NSSound(named: "Bubble")?.play()
+        default:
+            break
+        }
+        content.sound = nil
 
         let request = UNNotificationRequest(
             identifier: "run-\(run.id)",
