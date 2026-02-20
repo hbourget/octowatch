@@ -104,3 +104,12 @@ enum AggregateStatus: Sendable {
         }
     }
 }
+
+// MARK: - Per-Repo Status
+
+struct RepoStatusItem: Identifiable, Sendable, Equatable {
+    let repoFullName: String
+    let initial: Character
+    let status: AggregateStatus
+    var id: String { repoFullName }
+}

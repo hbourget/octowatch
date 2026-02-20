@@ -14,6 +14,8 @@ final class WorkflowViewModel {
     var errorMessage: String?
     var showSettings = false
     var aggregateStatus: AggregateStatus = .idle
+    var repoStatuses: [RepoStatusItem] = []
+    var pulsePhase: Bool = false
 
     // MARK: - Settings (persisted)
 
@@ -45,6 +47,7 @@ final class WorkflowViewModel {
 
     private let apiClient = GitHubAPIClient()
     private var pollingTask: Task<Void, Never>?
+    private var pulseTask: Task<Void, Never>?
     private var previousInProgressIds: Set<Int64> = []
     private var token: String?
 
@@ -79,6 +82,7 @@ final class WorkflowViewModel {
 
     func signOut() {
         stopPolling()
+        stopPulse()
         KeychainService.deletePAT()
         token = nil
         isAuthenticated = false
@@ -86,6 +90,7 @@ final class WorkflowViewModel {
         runs = []
         repos = []
         aggregateStatus = .idle
+        repoStatuses = []
         showSettings = false
         errorMessage = nil
     }
@@ -109,6 +114,7 @@ final class WorkflowViewModel {
 
             await fetchRuns()
             startPolling()
+            startPulse()
         } catch {
             handleError(error)
         }
@@ -125,6 +131,7 @@ final class WorkflowViewModel {
         guard !repoTuples.isEmpty else {
             runs = []
             aggregateStatus = .idle
+            repoStatuses = []
             return
         }
 
@@ -134,6 +141,7 @@ final class WorkflowViewModel {
             detectCompletions(newRuns: newRuns)
             runs = newRuns
             aggregateStatus = computeAggregateStatus(newRuns)
+            repoStatuses = computeRepoStatuses(newRuns)
 
             if let remaining = await apiClient.rateLimitRemaining, remaining < 100 {
                 errorMessage = "Rate limit low: \(remaining) requests remaining"
@@ -190,6 +198,38 @@ final class WorkflowViewModel {
     }
 
     // MARK: - Helpers
+
+    private func computeRepoStatuses(_ runs: [WorkflowRun]) -> [RepoStatusItem] {
+        var grouped: [String: [WorkflowRun]] = [:]
+        for run in runs {
+            guard let fullName = run.repository?.fullName else { continue }
+            grouped[fullName, default: []].append(run)
+        }
+
+        return grouped.keys.sorted().compactMap { fullName in
+            guard let repoRuns = grouped[fullName] else { return nil }
+            let repoName = fullName.split(separator: "/").last.map(String.init) ?? fullName
+            guard let initial = repoName.first?.uppercased().first else { return nil }
+            let status = computeAggregateStatus(repoRuns)
+            return RepoStatusItem(repoFullName: fullName, initial: initial, status: status)
+        }
+    }
+
+    private func startPulse() {
+        stopPulse()
+        pulseTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(800))
+                guard !Task.isCancelled else { break }
+                pulsePhase.toggle()
+            }
+        }
+    }
+
+    private func stopPulse() {
+        pulseTask?.cancel()
+        pulseTask = nil
+    }
 
     private func computeAggregateStatus(_ runs: [WorkflowRun]) -> AggregateStatus {
         guard !runs.isEmpty else { return .idle }

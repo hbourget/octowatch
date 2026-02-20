@@ -9,7 +9,7 @@ struct GitHubActionsBarApp: App {
             MainPopoverView(viewModel: viewModel)
                 .frame(width: 400, height: 500)
         } label: {
-            MenuBarLabel(status: viewModel.aggregateStatus)
+            MenuBarLabel(repoStatuses: viewModel.repoStatuses, pulsePhase: viewModel.pulsePhase)
         }
         .menuBarExtraStyle(.window)
     }
