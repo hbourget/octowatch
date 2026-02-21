@@ -2,7 +2,10 @@ import AppKit
 import Foundation
 import UserNotifications
 
+@MainActor
 enum NotificationService {
+    private static var currentSound: NSSound?
+
     static func requestPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) {
             _, _ in
@@ -29,12 +32,13 @@ enum NotificationService {
         content.body = "\(runName) on \(repoName)"
         switch run.conclusion {
         case .success:
-            NSSound(named: "Glass")?.play()
+            currentSound = NSSound(named: "Glass")
         case .failure:
-            NSSound(named: "Basso")?.play()
+            currentSound = NSSound(named: "Basso")
         default:
-            break
+            currentSound = nil
         }
+        currentSound?.play()
         content.sound = nil
 
         let request = UNNotificationRequest(
