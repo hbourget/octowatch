@@ -4,6 +4,8 @@ A lightweight, native macOS menu bar app that monitors your GitHub Actions workf
 
 Built with SwiftUI. No external dependencies. No tracking. No data collection.
 
+![Octowatch Demo](demo_octowatch.png)
+
 ## Features
 
 - **Menu bar status indicator** — see the state of your workflows at a glance
@@ -62,6 +64,17 @@ make clean    # Remove build artifacts and .app bundle
 | **Architecture** | MVVM |
 | **Dependencies** | None — stdlib, Foundation, SwiftUI, UserNotifications only |
 | **Min. deployment** | macOS 14.0 |
+
+## 🔒 Note on the macOS Keychain Prompt
+
+Because Octowatch is currently a free, open-source project, the downloaded app is not signed with a paid Apple Developer Developer ID.
+
+Because of this built-in macOS security feature, the system will ask for your permission the first time Octowatch tries to retrieve your GitHub token from the Keychain.
+
+**To fix this:**
+When the prompt appears, enter your Mac password and click **"Always Allow"**. macOS will remember this preference and the app will run silently in the background from then on.
+
+> **Note:** If this project gets enough traction and users, I plan to purchase an official Apple Developer license to properly code-sign the app, which will prevent this prompt from appearing at all.
 
 ## License
 
