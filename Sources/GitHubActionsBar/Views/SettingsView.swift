@@ -75,6 +75,14 @@ struct SettingsView: View {
                             }
                         }
 
+                    // Notification sounds
+                    Toggle("Notification Sounds", isOn: Binding(
+                        get: { viewModel.notificationSoundEnabled },
+                        set: { viewModel.notificationSoundEnabled = $0 }
+                    ))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+
                     Divider()
 
                     // Repo selection

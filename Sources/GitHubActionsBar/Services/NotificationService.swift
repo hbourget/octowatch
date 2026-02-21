@@ -12,7 +12,7 @@ enum NotificationService {
         }
     }
 
-    static func sendRunCompleted(run: WorkflowRun) {
+    static func sendRunCompleted(run: WorkflowRun, playSound: Bool = true) {
         let content = UNMutableNotificationContent()
 
         let repoName = run.repository?.fullName ?? "unknown"
@@ -30,15 +30,17 @@ enum NotificationService {
         }
 
         content.body = "\(runName) on \(repoName)"
-        switch run.conclusion {
-        case .success:
-            currentSound = NSSound(named: "Glass")
-        case .failure:
-            currentSound = NSSound(named: "Basso")
-        default:
-            currentSound = nil
+        if playSound {
+            switch run.conclusion {
+            case .success:
+                currentSound = NSSound(named: "Glass")
+            case .failure:
+                currentSound = NSSound(named: "Basso")
+            default:
+                currentSound = nil
+            }
+            currentSound?.play()
         }
-        currentSound?.play()
         content.sound = nil
 
         let request = UNNotificationRequest(

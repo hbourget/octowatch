@@ -27,6 +27,11 @@ final class WorkflowViewModel {
         }
     }
 
+    var notificationSoundEnabled: Bool {
+        get { UserDefaults.standard.object(forKey: "notificationSoundEnabled") as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: "notificationSoundEnabled") }
+    }
+
     var selectedRepoFullNames: Set<String> {
         get {
             guard let data = UserDefaults.standard.string(forKey: "selectedRepos"),
@@ -190,7 +195,7 @@ final class WorkflowViewModel {
 
         for run in newRuns where run.status == .completed {
             if previousInProgressIds.contains(run.id) {
-                NotificationService.sendRunCompleted(run: run)
+                NotificationService.sendRunCompleted(run: run, playSound: notificationSoundEnabled)
             }
         }
 
