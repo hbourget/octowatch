@@ -65,4 +65,4 @@ make clean    # Remove build artifacts and .app bundle
 
 ## License
 
-All rights reserved.
+This project is licensed under the [MIT License](LICENSE).
