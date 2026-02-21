@@ -22,7 +22,7 @@ Octowatch is fully local. It does not collect, store, or transmit any data to ex
 
 - macOS 14.0 or later
 - Swift 6.0+ (to build from source)
-- A [GitHub Personal Access Token](https://github.com/settings/tokens) with `repo` and `actions` read access
+- A [GitHub Personal Access Token (fine-grained)](https://github.com/settings/tokens?type=beta) with **read-only** access to **Actions**. You can scope it to all repositories or only the ones you want to monitor — Octowatch lets you pick specific repos from within the app
 
 ## Installation
 
