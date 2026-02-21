@@ -32,6 +32,12 @@ struct WorkflowRunRow: View {
                             Text(branch)
                                 .foregroundStyle(.secondary)
                         }
+                        if let duration = formattedDuration {
+                            Text("·")
+                                .foregroundStyle(.quaternary)
+                            Text(duration)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                     .font(.caption)
                     .lineLimit(1)
@@ -51,6 +57,24 @@ struct WorkflowRunRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private var formattedDuration: String? {
+        guard let startedAt = run.runStartedAt else { return nil }
+        let endDate = run.status == .completed ? run.updatedAt : now
+        let seconds = Int(endDate.timeIntervalSince(startedAt))
+        guard seconds >= 0 else { return nil }
+        if seconds < 60 {
+            return "\(seconds)s"
+        }
+        let minutes = seconds / 60
+        let remainingSeconds = seconds % 60
+        if minutes < 60 {
+            return remainingSeconds > 0 ? "\(minutes)m \(remainingSeconds)s" : "\(minutes)m"
+        }
+        let hours = minutes / 60
+        let remainingMinutes = minutes % 60
+        return remainingMinutes > 0 ? "\(hours)h \(remainingMinutes)m" : "\(hours)h"
     }
 
     @ViewBuilder

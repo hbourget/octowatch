@@ -42,6 +42,7 @@ struct WorkflowRun: Codable, Sendable, Identifiable {
     let status: RunStatus?
     let conclusion: RunConclusion?
     let htmlUrl: String
+    let runStartedAt: Date?
     let updatedAt: Date
     let headCommit: HeadCommit?
     let repository: RunRepository?
